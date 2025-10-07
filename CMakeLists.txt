@@ -10,6 +10,7 @@ option(RAWPROC_WITH_LIBRAW "Enable LibRaw-based RAW loading" OFF)
 option(RAWPROC_WITH_CIMG "Enable CImg (header-only) if available locally" ON)
 option(RAWPROC_WITH_TINYEXR "Enable TinyEXR (header-only) if available locally" ON)
 option(RAWPROC_WITH_STB "Enable stb_image_write (header-only) if available locally" ON)
+option(RAWPROC_WITH_WGPU "Enable wgpu GPU path (requires external setup)" OFF)
 
 # Helper: platform-specific shared library extension
 if(WIN32)
@@ -27,9 +28,35 @@ add_library(rawproc_core
   src/PAL/DynamicLibrary.cpp
   src/RawLoader.cpp
   src/ImageExporter.cpp
+  src/ThreadPool.cpp
+  src/GpuContext.cpp
+  $<$<BOOL:${RAWPROC_WITH_WGPU}>:src/GpuContextWgpu.cpp>
 )
 
 target_include_directories(rawproc_core PUBLIC include src/include)
+
+if (RAWPROC_WITH_WGPU)
+  # Allow user to place built wgpu-native under third_party/wgpu
+  set(WGPU_NATIVE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/wgpu" CACHE PATH "wgpu-native root (with include/ and lib/)")
+  set(WGPU_NATIVE_INCLUDE "${WGPU_NATIVE_ROOT}/include")
+  set(WGPU_NATIVE_LIB "${WGPU_NATIVE_ROOT}/lib/libwgpu_native.so")
+
+  if (EXISTS "${WGPU_NATIVE_INCLUDE}/wgpu.h" AND EXISTS "${WGPU_NATIVE_LIB}")
+    message(STATUS "Using wgpu-native from ${WGPU_NATIVE_ROOT}")
+    target_compile_definitions(rawproc_core PUBLIC RAWPROC_USE_WGPU_NATIVE=1)
+    target_include_directories(rawproc_core PRIVATE "${WGPU_NATIVE_INCLUDE}")
+    target_link_libraries(rawproc_core PRIVATE "${WGPU_NATIVE_LIB}")
+    # Vulkan is commonly required; try to find it, else warn
+    find_package(Vulkan QUIET)
+    if (Vulkan_FOUND)
+      target_link_libraries(rawproc_core PRIVATE Vulkan::Vulkan)
+    else()
+      message(WARNING "Vulkan not found. wgpu-native may require Vulkan runtime/loader on this platform.")
+    endif()
+  else()
+    message(WARNING "RAWPROC_WITH_WGPU=ON but wgpu-native headers/lib not found under ${WGPU_NATIVE_ROOT}. Place include/ and lib/ there or set WGPU_NATIVE_ROOT.")
+  endif()
+endif()
 
 # For Unix, export symbols for plugins if needed
 if(UNIX AND NOT APPLE)
@@ -39,6 +66,16 @@ endif()
 add_executable(rawproc_cli apps/main.cpp)
 
 target_link_libraries(rawproc_cli PRIVATE rawproc_core)
+
+# If WGPU is enabled and we found native libs, set runtime path on CLI target now.
+if (RAWPROC_WITH_WGPU)
+  if (EXISTS "${WGPU_NATIVE_INCLUDE}/wgpu.h" AND EXISTS "${WGPU_NATIVE_LIB}")
+    if (UNIX AND NOT APPLE)
+      set_target_properties(rawproc_cli PROPERTIES BUILD_RPATH "${WGPU_NATIVE_ROOT}/lib")
+      set_target_properties(rawproc_cli PROPERTIES INSTALL_RPATH "${WGPU_NATIVE_ROOT}/lib")
+    endif()
+  endif()
+endif()
 
 # Sample plugin
 add_library(denoise_plugin SHARED plugins/denoise/DenoisePlugin.cpp)

@@ -56,6 +56,14 @@ public:
     // Processing entry points (plugin implements one depending on stage)
     virtual void process_raw(RawImage& raw) { (void)raw; }
     virtual void process_rgb(RgbImageF& rgb) { (void)rgb; }
+
+    // Optional: kernel radius in pixels for the plugin at its stage, used to compute tile aprons.
+    // Default 0 means no neighborhood dependency.
+    virtual size_t kernelRadiusPx() const { return 0; }
+
+    // Optional: a stable hash of current parameter state for caching/invalidation.
+    // Default 0 (treated as no state impact).
+    virtual size_t stateHash() const { return 0; }
 };
 
 } // namespace rawproc

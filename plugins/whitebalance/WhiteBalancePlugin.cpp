@@ -37,6 +37,15 @@ public:
         }
     }
 
+    size_t stateHash() const override {
+        size_t h = 0;
+        auto mix = [&](size_t v){ h ^= v + 0x9e3779b97f4a7c15ULL + (h<<6) + (h>>2); };
+        mix(std::hash<int>()(static_cast<int>(r_*1000))); 
+        mix(std::hash<int>()(static_cast<int>(g_*1000)));
+        mix(std::hash<int>()(static_cast<int>(b_*1000)));
+        return h;
+    }
+
 private:
     std::string name_ = "WhiteBalance";
     float r_ = 1.0f, g_ = 1.0f, b_ = 1.0f;
@@ -44,4 +53,3 @@ private:
 } // namespace
 
 extern "C" rawproc::IProcessingPlugin* create_plugin() { return new WhiteBalancePlugin(); }
-

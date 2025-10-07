@@ -34,6 +34,10 @@ public:
         }
     }
 
+    size_t stateHash() const override {
+        return std::hash<int>()(static_cast<int>(gamma_ * 1000.0f));
+    }
+
 private:
     std::string name_ = "Gamma";
     float gamma_ = 2.2f;
@@ -41,4 +45,3 @@ private:
 }
 
 extern "C" rawproc::IProcessingPlugin* create_plugin() { return new GammaPlugin(); }
-

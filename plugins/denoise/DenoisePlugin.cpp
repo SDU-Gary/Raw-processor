@@ -26,6 +26,12 @@ public:
         return false;
     }
 
+    size_t kernelRadiusPx() const override { return (strength_ <= 0.001f ? 0u : (strength_ < 0.5f ? 1u : 2u)); }
+    size_t stateHash() const override {
+        // Simple float hash
+        return std::hash<int>()(static_cast<int>(strength_ * 1000.0f + 0.5f));
+    }
+
     void process_raw(RawImage& raw) override {
         if (raw.data.empty() || raw.width < 3 || raw.height < 3) return;
         // Very cheap box blur pass controlled by strength.
